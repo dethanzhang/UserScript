@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         点点数据导出榜单与候选清单
 // @namespace    https://app.diandian.com/
-// @version      1.0
+// @version      2025-02-07
 // @description  在榜单和详细页面导出勾选和候选清单合并后的应用信息，并提供清单查看、删除和清空功能
-// @author       YourName
+// @author       DethanZ
 // @match        https://app.diandian.com/rank/*
 // @match        https://app.diandian.com/app/*
 // @grant        none
 // ==/UserScript==
+
 
 (function() {
     'use strict';
