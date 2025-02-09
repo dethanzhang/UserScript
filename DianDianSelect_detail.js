@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         点点数据详细页增强版
+// @name         点点数据详细页基础版
 // @namespace    https://app.diandian.com/
-// @version      2025-02-08
+// @version      2025-02-09
 // @description  在榜单和详细页面导出勾选和候选清单合并后的应用信息，并提供清单查看、删除和清空功能
 // @author       DethanZ
 // @match        https://app.diandian.com/rank/*
@@ -12,7 +12,10 @@
 (function () {
   ("use strict");
   // 判断当前页面类型
-  const isAppDetailPage = window.location.href.includes("/app/");
+  const isAppDetailPage =
+    window.location.href.includes("/app/") &&
+    window.location.href.includes("/googleplay?"); //暂不支持ios
+  const isRankDetailPage = window.location.href.includes("/googleplay-rank?"); //暂不支持ios
 
   // 存储候选应用清单
   const candidates = JSON.parse(localStorage.getItem("candidates")) || [];
@@ -36,6 +39,28 @@
     const month = String(now.getMonth() + 1).padStart(2, "0"); // 月份是从 0 开始的
     const day = String(now.getDate()).padStart(2, "0");
     return `${year}${month}${day}`;
+  }
+
+  // 格式化数字为中文格式
+  function formatNumberToChinese(numStr) {
+    numStr = numStr.replace(/,/g, "");
+    const hasPlus = numStr.includes("+");
+    const num = parseFloat(numStr.replace("+", ""));
+
+    let result;
+    if (num >= 100000000) {
+      result = Math.round(num / 100000000) + "亿"; // 四舍五入到整数
+    } else if (num >= 10000) {
+      result = Math.round(num / 10000) + "万"; // 四舍五入到整数
+    } else {
+      result = num.toString();
+    }
+
+    if (hasPlus) {
+      result += "+";
+    }
+
+    return result;
   }
 
   // 创建上方按钮: 加入候选
@@ -158,24 +183,53 @@
     renderCandidatesPanel(); // 更新面板
   }
 
-  // TODO: 排名、下载量、上线时间
+  // 在详细页面中获取正确的应用类别
+  function getCategoryAndDownloads() {
+    // 先获取正确的父容器
+    const parentContainer = document.querySelector("div.app-info-card.dd-flex");
+    if (!parentContainer) {
+      console.log("未找到正确的父容器！");
+      return "未知类别";
+    }
+    // 获取该容器下所有 app-info-card-item
+    const items = parentContainer.querySelectorAll("div.app-info-card-item");
+
+    // 获取items中的第3个元素
+    const blockCategory = items[2].querySelector("div.app-desc-value");
+    const categoryElement = blockCategory.querySelector("a.dd-desc-color");
+
+    // 获取items中的倒数第2个元素
+    const blockDownloads =
+      items[items.length - 2].querySelector("div.app-value");
+    const downloadsElement = blockDownloads.querySelector("a.app-value");
+    // 返回类别和下载量
+    return {
+      appCategory: categoryElement
+        ? categoryElement.innerText.trim()
+        : "未知类别",
+      appDownloads: downloadsElement
+        ? downloadsElement.innerText.trim()
+        : "未知下载量",
+    };
+  }
+
+  // TODO: 排名数据获取 下载量
   // 添加应用到候选清单
   function addToCandidates() {
     const appName = document.querySelector("div.ellip.font-600")
       ? document.querySelector("div.ellip.font-600").innerText.trim()
-      : "未知"; // 应用名称
-    const appCategory = getCategoryAndDownloads().category; // 应用类别
-    const appLink = window.location.href; // 应用链接
-    // const appRank = document.querySelector("div.app-rank"); // 应用排名
-    const appDownloads = getCategoryAndDownloads().downloads; // 应用下载量
-    const appPubTime = getPubTime(); // 应用上线时间
+      : "未知";
+    const { appCategory, appDownloads } = getCategoryAndDownloads(); // 应用类别和下载量
+    const appLink = window.location.href.replace(
+      "/googleplay-rank?",
+      "/googleplay?"
+    );
 
     // 将当前应用的信息加入候选清单
     const appData = {
       name: appName,
       category: appCategory,
-      downloads: appDownloads,
-      pubTime: appPubTime,
+      downloads: formatNumberToChinese(appDownloads),
       link: appLink,
     };
     if (!candidates.some((app) => app.link === appData.link)) {
@@ -196,45 +250,18 @@
     return item ? item.innerText.trim() : "未知下载量";
   }
 
-  // 在详细页面中获取正确的应用类别
-  function getCategoryAndDownloads() {
-    // 先获取正确的父容器
-    const parentContainer = document.querySelector("div.app-info-card.dd-flex");
-    if (!parentContainer) {
-      console.log("未找到正确的父容器！");
-      return "未知类别";
-    }
-    // 获取该容器下所有 app-info-card-item
-    const items = parentContainer.querySelectorAll("div.app-info-card-item");
-
-    // 获取items中的第3个元素
-    const blockCategory = items[2].querySelector("div.app-desc-value");
-    const categoryElement = blockCategory.querySelector("a.dd-desc-color");
-
-    // 获取items中的倒数第2个元素
-    const blockDownloads =
-      items[items.length - 2].querySelector("div.app-value");
-    const downloadsElement = blockDownloads.querySelector("a.app-value");
-
-    // 返回类别和下载量
-    return {
-      category: categoryElement ? categoryElement.innerText.trim() : "未知类别",
-      downloads: downloadsElement
-        ? downloadsElement.innerText.trim()
-        : "未知下载量",
-    };
-  }
-
   // **通用 CSV 导出函数**
   function exportToCSV(data, filename) {
-    // 去重：基于应用链接进行去重
-    const uniqueData = Array.from(new Set(data.map((a) => a.link))).map(
-      (link) => data.find((a) => a.link === link)
+    // 去重：基于应用名称进行去重
+    const uniqueData = Array.from(new Set(data.map((app) => app.name))).map(
+      (name) => {
+        return data.find((app) => app.name === name);
+      }
     );
 
-    let csvContent = "名称,类别,链接\n";
+    let csvContent = "名称,类别,下载量,链接\n";
     uniqueData.forEach((app) => {
-      csvContent += `"${app.name}","${app.category}","${app.link}"\n`;
+      csvContent += `"${app.name}","${app.category}","${app.downloads}","${app.link}"\n`;
     });
 
     // 生成带日期的文件名
@@ -263,7 +290,7 @@
   }
 
   // 详情页显示“加入候选”
-  if (isAppDetailPage) {
+  if (window.location.href.includes("/app/")) {
     createButton("加入候选", addToCandidates);
   }
 
