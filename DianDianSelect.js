@@ -20,17 +20,29 @@
   // 存储候选应用清单
   const candidates = JSON.parse(localStorage.getItem("candidates")) || [];
 
+  // Debounce function to limit how often a function runs
+  function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+  }
+
   // 监听页面可见性变化
-  document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible") {
-      // 重新读取 localStorage 中的 candidates
-      const updatedCandidates =
-        JSON.parse(localStorage.getItem("candidates")) || [];
-      candidates.length = 0; // 清空当前数组
-      candidates.push(...updatedCandidates); // 更新为最新的候选清单
-      renderCandidatesPanel(); // 更新候选清单面板
-    }
-  });
+  document.addEventListener(
+    "visibilitychange",
+    debounce(function () {
+      if (document.visibilityState === "visible") {
+        // 重新读取 localStorage 中的 candidates
+        const updatedCandidates =
+          JSON.parse(localStorage.getItem("candidates")) || [];
+        candidates.length = 0; // 清空当前数组
+        candidates.push(...updatedCandidates); // 更新为最新的候选清单
+        renderCandidatesPanel(); // 更新候选清单面板
+      }
+    }, 1000)
+  );
 
   // 获取当前日期（格式：YYYYMMDD）
   function getCurrentDate() {
