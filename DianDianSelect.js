@@ -1,23 +1,20 @@
 // ==UserScript==
 // @name         点点数据详细页完整版
-// @namespace    https://app.diandian.com/
 // @version      2025-02-12
-// @description  在榜单详细页面加入候选, 并提供清单查看、删除和清空功能, 导出所有候选应用的 CSV 文件
 // @author       DethanZ
+// @description  在榜单详细页面加入候选, 并提供清单查看、删除和清空功能, 导出所有候选应用的 CSV 文件
+// @icon         data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD4AAAA+CAYAAABzwahEAAAE0klEQVRoBeXBPWjcZgCA4VefdGdHtppQixYfqJAhd0uXcEMhhpIETwZ5TJNs6eAbSungpgS6uNChNO7WDDGk2fKz2iVZjGsoXkqNl3a4yxCIQK7NXS6JfEp8sk7FgyEc+i4+6ZwE9DxKsxVFZJAgowQZJcgoQUYJMkqQUYKMEmSUIKMEGSXIKEFGaQzA39Vdfl/zed2oLrg8OUrBVDmwtOazXt1FZtzUMHSFopWjZOUxdIWjopGS2wipXG8QZ7MR8stXH7Jvac1n7vYz+lEu5bHP6NgTOoMmSKn2JOAwqk5Av9arbeZuP8O+tsXSms8gCVJyG3vIFK0cB2pOQFJuPWTu9jNmbzzFrYcMgiAltx4iUxhTOeD5EWmtbryiMl/HrYekJUip5gTIFEyVAzUnYBDcekhlvo7nR6QhOCIFU6Vo5dnn+R0Gya2HzN5okIbSbEURKbiNkKU1n27nTg9TtHIcWN14RdUJkPH8DjUnoOYEeH7EYcxdOYE9oZOE0mxFEe+ZpTWfhUUPtxHSi6ELln76GENX6JfgPWRP6Nz8zuTs6WF68fwOqxsvSUJptqKIhDw/4ubiC3b8Dq8b1QWV6Q8wdIW0Zm88ZXXjFTLlUp6Fqyb90kjh5uIL7i63iFOyctgTOmnNXTmBXd3C8yPirFfbeH6EoSv0Q5BCzQmQKZgqg2Dogplpg15qTpt+aaTg+REy42MacYbv3yK/8pB90cgo0cgo7XNTtM9PIWOf0VlY9PD8iDhVZ49yaYh+aKRQcwJkCqZKt/zKA4bv/UY37Z8NtH838L/+njiGLihaOdarbeJ4fod+CRJy6yEyRStHnNxffyKTX3nA8P1byBStHIMkSMht7CFj6ApxxPYmveRXHiJj6IJBEiRUcwJkilaOOOrjR/QitjdJwtAF/RIk5NZDZAqmRjexvcmbRCOjyNScNjKFMZV+CRLabOwhU7I0uont/3iT8OQpZGpP9pApWjn6JUjIrXeQGdVVuontTd6kfW6KODUnwG2ExCmYKgVTpV+ChDYbe8iULI1uYnuTXnbtC7TPTxHnzvIOMuXiEEkIEvD8Dp4fEacwphJHae0gs2tf4OWX3xDHbYQsrb1Exp44RhIaCVSdAJlxUyXOrn0B9fEjXheePEXw2efsfXoamcrPdWSKVo5yaYgkNBLY8SP61flonJ0ff6Uf8/ee4zZCZC5PjpCUIIGqEyBTc/YYhPl7z7m73ELm7Olh7AmdpAQJeH4HGc/vsF7dJSm3ETJzvc7d5RYyhq4w+8Vx0hAkYOiCXmZvNHHrIf3w/Iibix6Xf9hmvdqml8r0BxRMlTQ0EiiMqfTi+R3sa1vYZ45RLg0xbqp08/yIHb9D1QmoOQHr1TaHUZk2uDQ5QlpKsxVF9Mmth9jXtnjb7AmduSsnGARBAgVTpVzK8zZVpg3mrpxgUAQJVaYN3gZDV/j24nFmpg0GSZBQuTTE5ckRjlK5lGfhqsmlyREGTSOF2YvH2XdnucUgFUyVGdvAntA5KkqzFUWktLTms7Do4TZCkjJ0haKVozJtUC4NcdSUZiuKGJD16i5/bLyi5gQcRmFMpfhJjpKVo2jlMXSFt0VptqKIDBJklCCjBBklyChBRgkySpBRgowSZJQgowQZpfHuRbwD/wOX1rro0ceVGQAAAABJRU5ErkJggg==
 // @match        https://app.diandian.com/rank/*
 // @match        https://app.diandian.com/app/*
-// @icon         data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD4AAAA+CAYAAABzwahEAAAE0klEQVRoBeXBPWjcZgCA4VefdGdHtppQixYfqJAhd0uXcEMhhpIETwZ5TJNs6eAbSungpgS6uNChNO7WDDGk2fKz2iVZjGsoXkqNl3a4yxCIQK7NXS6JfEp8sk7FgyEc+i4+6ZwE9DxKsxVFZJAgowQZJcgoQUYJMkqQUYKMEmSUIKMEGSXIKEFGaQzA39Vdfl/zed2oLrg8OUrBVDmwtOazXt1FZtzUMHSFopWjZOUxdIWjopGS2wipXG8QZ7MR8stXH7Jvac1n7vYz+lEu5bHP6NgTOoMmSKn2JOAwqk5Av9arbeZuP8O+tsXSms8gCVJyG3vIFK0cB2pOQFJuPWTu9jNmbzzFrYcMgiAltx4iUxhTOeD5EWmtbryiMl/HrYekJUip5gTIFEyVAzUnYBDcekhlvo7nR6QhOCIFU6Vo5dnn+R0Gya2HzN5okIbSbEURKbiNkKU1n27nTg9TtHIcWN14RdUJkPH8DjUnoOYEeH7EYcxdOYE9oZOE0mxFEe+ZpTWfhUUPtxHSi6ELln76GENX6JfgPWRP6Nz8zuTs6WF68fwOqxsvSUJptqKIhDw/4ubiC3b8Dq8b1QWV6Q8wdIW0Zm88ZXXjFTLlUp6Fqyb90kjh5uIL7i63iFOyctgTOmnNXTmBXd3C8yPirFfbeH6EoSv0Q5BCzQmQKZgqg2Dogplpg15qTpt+aaTg+REy42MacYbv3yK/8pB90cgo0cgo7XNTtM9PIWOf0VlY9PD8iDhVZ49yaYh+aKRQcwJkCqZKt/zKA4bv/UY37Z8NtH838L/+njiGLihaOdarbeJ4fod+CRJy6yEyRStHnNxffyKTX3nA8P1byBStHIMkSMht7CFj6ApxxPYmveRXHiJj6IJBEiRUcwJkilaOOOrjR/QitjdJwtAF/RIk5NZDZAqmRjexvcmbRCOjyNScNjKFMZV+CRLabOwhU7I0uont/3iT8OQpZGpP9pApWjn6JUjIrXeQGdVVuontTd6kfW6KODUnwG2ExCmYKgVTpV+ChDYbe8iULI1uYnuTXnbtC7TPTxHnzvIOMuXiEEkIEvD8Dp4fEacwphJHae0gs2tf4OWX3xDHbYQsrb1Exp44RhIaCVSdAJlxUyXOrn0B9fEjXheePEXw2efsfXoamcrPdWSKVo5yaYgkNBLY8SP61flonJ0ff6Uf8/ee4zZCZC5PjpCUIIGqEyBTc/YYhPl7z7m73ELm7Olh7AmdpAQJeH4HGc/vsF7dJSm3ETJzvc7d5RYyhq4w+8Vx0hAkYOiCXmZvNHHrIf3w/Iibix6Xf9hmvdqml8r0BxRMlTQ0EiiMqfTi+R3sa1vYZ45RLg0xbqp08/yIHb9D1QmoOQHr1TaHUZk2uDQ5QlpKsxVF9Mmth9jXtnjb7AmduSsnGARBAgVTpVzK8zZVpg3mrpxgUAQJVaYN3gZDV/j24nFmpg0GSZBQuTTE5ckRjlK5lGfhqsmlyREGTSOF2YvH2XdnucUgFUyVGdvAntA5KkqzFUWktLTms7Do4TZCkjJ0haKVozJtUC4NcdSUZiuKGJD16i5/bLyi5gQcRmFMpfhJjpKVo2jlMXSFt0VptqKIDBJklCCjBBklyChBRgkySpBRgowSZJQgowQZpfHuRbwD/wOX1rro0ceVGQAAAABJRU5ErkJggg==
-// @grant        none
-// @sandbox      JavaScript
 // @license      GPL-3.0 License
-// @run-at       document-end
-// @namespace    https://github.com/dethanzhang/UserScript/blob/main/DianDianSelect.js
+// @run-at       document-start
+// @namespace    http://tampermonkey.net/
 // @supportURL   https://github.com/dethanzhang/UserScript
 // @homepageURL  https://github.com/dethanzhang/UserScript
 // ==/UserScript==
 
 (function () {
-  ("use strict");
+  "use strict";
 
   // 存储候选应用清单
   const candidates = JSON.parse(localStorage.getItem("candidates")) || [];
