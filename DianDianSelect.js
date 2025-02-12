@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         点点数据详细页基础版
+// @name         点点数据详细页完整版
 // @namespace    https://app.diandian.com/
-// @version      2025-02-10
-// @description  在榜单和详细页面导出勾选和候选清单合并后的应用信息，并提供清单查看、删除和清空功能
+// @version      2025-02-12
+// @description  在榜单详细页面加入候选, 并提供清单查看、删除和清空功能, 导出所有候选应用的 CSV 文件
 // @author       DethanZ
 // @match        https://app.diandian.com/rank/*
 // @match        https://app.diandian.com/app/*
@@ -11,40 +11,96 @@
 
 (function () {
   ("use strict");
-  // 判断当前页面类型
-  const isAppDetailPage =
-    window.location.href.includes("/app/") &&
-    window.location.href.includes("/googleplay?"); //暂不支持ios
-  const isRankDetailPage = window.location.href.includes("/googleplay-rank?"); //暂不支持ios
 
   // 存储候选应用清单
   const candidates = JSON.parse(localStorage.getItem("candidates")) || [];
 
-  // Debounce function to limit how often a function runs
-  function debounce(func, wait) {
-    let timeout;
-    return function (...args) {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func.apply(this, args), wait);
-    };
-  }
+  // 备份原始的 open 和 send 方法
+  const _open = XMLHttpRequest.prototype.open;
+  const _send = XMLHttpRequest.prototype.send;
 
-  // 监听页面可见性变化
-  document.addEventListener(
-    "visibilitychange",
-    debounce(function () {
-      if (document.visibilityState === "visible") {
-        // 重新读取 localStorage 中的 candidates
-        const updatedCandidates =
-          JSON.parse(localStorage.getItem("candidates")) || [];
-        candidates.length = 0; // 清空当前数组
-        candidates.push(...updatedCandidates); // 更新为最新的候选清单
-        renderCandidatesPanel(); // 更新候选清单面板
+  // 重写 open 方法
+  XMLHttpRequest.prototype.open = function (
+    method,
+    url,
+    async,
+    user,
+    password
+  ) {
+    this._url = url; // 记录请求的 URL
+    return _open.apply(this, arguments);
+  };
+
+  // 使用闭包来确保每个页面有独立的 captured 和 rankjson 变量
+  (function () {
+    let captured = false;
+    let rankjson = [];
+
+    const pattern = /\/trend\?.*&brand_id=0/; // 判断是否为指定的请求链接
+
+    // 重写 send 方法
+    XMLHttpRequest.prototype.send = function (body) {
+      // 如果是符合条件的url则捕获
+      if (!captured && pattern.test(this._url)) {
+        let _onload = this.onload; // 备份原来的 onload 事件（如果有）
+        this.onload = function (event) {
+          if (_onload) _onload.call(this, event); // 保持原来的逻辑
+          rankjson.push(JSON.parse(this.responseText));
+          captured = true; // 处理完后设置标志为 true，停止进一步捕获
+        };
       }
-    }, 1000)
-  );
+      return _send.apply(this, arguments);
+    };
 
-  // 获取当前日期（格式：YYYYMMDD）
+    // **添加应用到候选清单&存储所有数据的逻辑**
+    async function addToCandidates() {
+      if (!captured) {
+        clickBtn();
+      }
+      // 等待 captured 变为 true
+      while (!captured) {
+        await new Promise((resolve) => setTimeout(resolve, 500)); // 等待
+      }
+
+      const { rank1, rank2, rank3 } = processJsonData(rankjson[0].data.list); // 处理jsonData
+
+      const appName = document.querySelector("div.ellip.font-600")
+        ? document.querySelector("div.ellip.font-600").innerText.trim()
+        : "未知";
+      const { appCategory, appDownloads } = getCategoryAndDownloads(); // 应用类别和下载量
+      const appLink = window.location.href.replace(
+        "/googleplay-rank?",
+        "/googleplay?"
+      );
+
+      // 将当前应用的信息加入候选清单
+      const appData = {
+        name: appName,
+        category: appCategory,
+        rank1: rank1,
+        rank2: rank2,
+        rank3: rank3,
+        downloads: formatNumberToChinese(appDownloads),
+        pubtime: getPubTime(),
+        link: appLink,
+      };
+      if (!candidates.some((app) => app.link === appData.link)) {
+        candidates.push(appData); // 确保去重
+        localStorage.setItem("candidates", JSON.stringify(candidates));
+        // alert('已加入候选清单！');
+        renderCandidatesPanel(); // 更新候选清单面板
+      } else {
+        alert("此应用已在候选清单中！");
+      }
+    }
+
+    // 详情页显示“加入候选”
+    if (window.location.href.includes("/app/")) {
+      createButton("加入候选", addToCandidates);
+    }
+  })();
+
+  // **获取当前日期（格式：YYYYMMDD）**
   function getCurrentDate() {
     const now = new Date();
     const year = now.getFullYear();
@@ -53,7 +109,7 @@
     return `${year}${month}${day}`;
   }
 
-  // 格式化数字为中文格式
+  // **格式化数字为中文格式**
   function formatNumberToChinese(numStr) {
     numStr = numStr.replace(/,/g, "");
     const hasPlus = numStr.includes("+");
@@ -67,15 +123,37 @@
     } else {
       result = num.toString();
     }
-
     if (hasPlus) {
       result += "+";
     }
-
     return result;
   }
 
-  // 创建上方按钮: 加入候选
+  // **监听页面可见性变化**
+  function visibilityChangeHandler() {
+    if (document.visibilityState === "hidden") {
+      stopListener(); // 切到后台时停止监听
+      requestAnimationFrame(startListener); // 下次回到前台时重新监听
+    }
+  }
+
+  // **开始监听**
+  function startListener() {
+    // 重新读取 localStorage 中的 candidates
+    const updatedCandidates =
+      JSON.parse(localStorage.getItem("candidates")) || [];
+    candidates.length = 0; // 清空当前数组
+    candidates.push(...updatedCandidates); // 更新为最新的候选清单
+    renderCandidatesPanel(); // 更新候选清单面板
+    document.addEventListener("visibilitychange", visibilityChangeHandler);
+  }
+
+  // **停止监听**
+  function stopListener() {
+    document.removeEventListener("visibilitychange", visibilityChangeHandler);
+  }
+
+  // **创建上方按钮: 加入候选**
   function createButton(text, onClickHandler) {
     const button = document.createElement("button");
     button.innerText = text;
@@ -94,7 +172,7 @@
     document.body.appendChild(button);
   }
 
-  // 创建按钮: 导出候选清单
+  // **创建按钮: 导出候选清单**
   function createExportButton() {
     const exportButton = document.createElement("button");
     exportButton.textContent = "导出候选清单CSV";
@@ -113,7 +191,7 @@
     return exportButton;
   }
 
-  // 创建候选清单面板
+  // **创建候选清单面板**
   function createCandidatesPanel() {
     const panel = document.createElement("div");
     panel.id = "candidatesPanel";
@@ -147,7 +225,7 @@
     document.body.appendChild(panel);
   }
 
-  // 渲染候选清单
+  // **渲染候选清单**
   function renderCandidatesPanel() {
     const panel = document.getElementById("candidatesPanel");
     panel.style.display = "block"; // 显示候选面板
@@ -190,21 +268,21 @@
     });
   }
 
-  // 删除候选清单中的某个应用
+  // **删除候选清单中的某个应用**
   function deleteCandidate(index) {
     candidates.splice(index, 1);
     localStorage.setItem("candidates", JSON.stringify(candidates));
     renderCandidatesPanel(); // 更新面板
   }
 
-  // 清空候选清单
+  // **清空候选清单**
   function clearCandidates() {
     candidates.length = 0;
     localStorage.setItem("candidates", JSON.stringify(candidates));
     renderCandidatesPanel(); // 更新面板
   }
 
-  // 在详细页面中获取正确的应用类别
+  // **获取应用类别和下载量**
   function getCategoryAndDownloads() {
     // 先获取正确的父容器
     const parentContainer = document.querySelector("div.app-info-card.dd-flex");
@@ -234,36 +312,7 @@
     };
   }
 
-  // TODO: 排名数据
-  // 添加应用到候选清单
-  function addToCandidates() {
-    const appName = document.querySelector("div.ellip.font-600")
-      ? document.querySelector("div.ellip.font-600").innerText.trim()
-      : "未知";
-    const { appCategory, appDownloads } = getCategoryAndDownloads(); // 应用类别和下载量
-    const appLink = window.location.href.replace(
-      "/googleplay-rank?",
-      "/googleplay?"
-    );
-
-    // 将当前应用的信息加入候选清单
-    const appData = {
-      name: appName,
-      category: appCategory,
-      downloads: formatNumberToChinese(appDownloads),
-      pubtime: getPubTime(),
-      link: appLink,
-    };
-    if (!candidates.some((app) => app.link === appData.link)) {
-      candidates.push(appData); // 确保去重
-      localStorage.setItem("candidates", JSON.stringify(candidates));
-      // alert('已加入候选清单！');
-      renderCandidatesPanel(); // 更新候选清单面板
-    } else {
-      alert("此应用已在候选清单中！");
-    }
-  }
-
+  // **获取应用发布时间**
   function getPubTime() {
     const parentContainer = document.querySelector("div.app-base-info-wrap");
     if (!parentContainer) {
@@ -275,6 +324,49 @@
     return item ? item.innerText.trim() : "-";
   }
 
+  // **模拟点击"排行榜全部"按钮**
+  function clickBtn() {
+    const btn = document
+      .querySelector("ul.filter-list.filter-group.dd-overflow-visible")
+      .querySelectorAll("a.toggle-item")[0];
+    if (btn) {
+      btn.click();
+    }
+  }
+
+  // **将存储的jsonData进行处理**
+  // "rank_type": 2, 游戏榜
+  // "genre_id": 33, 游戏总榜
+  // "brand_id": 1, 免费
+  // "brand_id": 2, 畅销
+  // "brand_id": 3, 付费
+  // "brand_id": 5, 人气蹿升
+  function processJsonData(rankData) {
+    let rank1 = "-";
+    let rank2 = "-";
+    let rank3 = "-";
+
+    rankData.forEach((item) => {
+      if (
+        item.rank_type === 2 &&
+        item.genre_id === 33 &&
+        (item.brand_id === 1 || item.brand_id === 3)
+      ) {
+        // 免费/付费榜排名
+        rank1 = item.stats.at(-1).at(-1) ? item.stats.at(-1).at(-1) : "-";
+      }
+      if (item.rank_type === 2 && item.genre_id === 33 && item.brand_id === 2) {
+        // 畅销榜排名
+        rank2 = item.stats.at(-1).at(-1) ? item.stats.at(-1).at(-1) : "-";
+      }
+      if (item.rank_type === 2 && item.genre_id === 33 && item.brand_id === 5) {
+        // 人气蹿升榜排名
+        rank3 = item.stats.at(-1).at(-1) ? item.stats.at(-1).at(-1) : "-";
+      }
+    });
+    return { rank1, rank2, rank3 };
+  }
+
   // **通用 CSV 导出函数**
   function exportToCSV(data, filename) {
     // 去重：基于应用名称进行去重
@@ -284,9 +376,10 @@
       }
     );
 
-    let csvContent = "名称,类别,下载量,发布时间,链接\n";
+    let csvContent =
+      "名称,类别,免费/付费榜,畅销榜,人气蹿升榜,下载量,发布时间,链接\n";
     uniqueData.forEach((app) => {
-      csvContent += `"${app.name}","${app.category}","${app.downloads}","${app.pubtime}","${app.link}"\n`;
+      csvContent += `"${app.name}","${app.category}","${app.rank1}","${app.rank2}","${app.rank3}","${app.downloads}","${app.pubtime}","${app.link}"\n`;
     });
 
     // 生成带日期的文件名
@@ -314,10 +407,8 @@
     clearCandidates();
   }
 
-  // 详情页显示“加入候选”
-  if (window.location.href.includes("/app/")) {
-    createButton("加入候选", addToCandidates);
-  }
+  // **主逻辑**
+  requestAnimationFrame(startListener); // 开始监听页面可见性变化
 
   createCandidatesPanel(); // 创建候选清单面板
   renderCandidatesPanel(); // 渲染候选清单
