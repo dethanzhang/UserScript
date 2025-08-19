@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         自动点击按钮工具（实时更新ID）
+// @name         自动点击按钮工具
 // @namespace    http://tampermonkey.net/
 // @version      1.1
 // @description  在页面右下角添加控制面板，可设置自动点击参数，并实时更新最后点击的按钮ID
@@ -62,11 +62,6 @@
             color: #666;
             margin-top: 5px;
         }
-        #autoClickerPanel #statusDisplay {
-            font-size: 12px;
-            color: red;
-            margin-top: 5px;
-        }
     `;
   document.head.appendChild(style);
 
@@ -77,7 +72,7 @@
         <h3>自动点击工具</h3>
         <label for="btnIdInput">按钮ID:</label>
         <input type="text" id="btnIdInput" placeholder="输入要点击的按钮ID">
-        <div class="last-clicked" id="statusDisplay">当前按钮ID将随您点击自动更新</div>
+        <div class="last-clicked">当前按钮ID将随您点击自动更新</div>
 
         <label for="clickTimesInput">点击次数:</label>
         <input type="number" id="clickTimesInput" value="100" min="1" placeholder="输入点击次数">
@@ -96,17 +91,17 @@
   const delayInput = document.getElementById("delayInput");
   const startBtn = document.getElementById("startClickingBtn");
   const stopBtn = document.getElementById("stopClickingBtn");
-  const statusDisplay = document.getElementById("statusDisplay");
 
   let intervalId = null;
 
   // 监听页面上的所有点击事件
   document.addEventListener("click", function (e) {
     // 排除自动点击器面板上的元素
-    if (panel.contains(e.target)) {
+    if (e.target.closest("#autoClickerPanel")) {
       return;
     }
 
+    // 检查点击的元素是否是按钮
     const isButton =
       e.target.tagName === "BUTTON" ||
       (e.target.tagName === "INPUT" &&
@@ -114,60 +109,49 @@
       e.target.getAttribute("role") === "button";
 
     if (isButton && e.target.id) {
+      // 直接更新输入框中的按钮ID
       btnIdInput.value = e.target.id;
-      statusDisplay.textContent = "当前按钮ID将随您点击自动更新";
     }
   });
 
   // 开始点击函数
   function startClicking() {
-    const btnId = btnIdInput.value.trim() || "btnAddProc";
-    let clkTimes = parseInt(clickTimesInput.value);
-    let delayMs = parseInt(delayInput.value);
+    const btnId = btnIdInput.value || "btnAddProc";
+    const clkTimes = parseInt(clickTimesInput.value) || 100;
+    const delayMs = parseInt(delayInput.value) || 10;
 
-    // 输入验证
-    if (isNaN(clkTimes) || clkTimes <= 0) {
-      clkTimes = 100;
-      statusDisplay.textContent = "点击次数无效，已使用默认值 100";
-    }
-    if (isNaN(delayMs) || delayMs <= 0) {
-      delayMs = 10;
-      statusDisplay.textContent = "间隔时间无效，已使用默认值 10ms";
-    }
-
+    let clickCount = 0;
     const button = document.getElementById(btnId);
+
     if (!button) {
-      statusDisplay.textContent = `错误：未找到ID为"${btnId}"的按钮！`;
+      alert(`未找到ID为"${btnId}"的按钮！`);
       return;
     }
 
-    let clickCount = 0;
+    // 禁用开始按钮，启用停止按钮
     startBtn.disabled = true;
     stopBtn.disabled = false;
 
-    function clickLoop() {
-      if (clickCount >= clkTimes || !intervalId) {
+    intervalId = setInterval(() => {
+      if (clickCount < clkTimes) {
+        button.click();
+        clickCount++;
+        console.log(`已点击 ${clickCount} 次，共 ${clkTimes} 次`);
+      } else {
         stopClicking();
-        statusDisplay.textContent = `已完成 ${clkTimes} 次点击`;
-        return;
+        console.log(`已完成 ${clkTimes} 次点击`);
       }
-      button.click();
-      clickCount++;
-      statusDisplay.textContent = `已点击 ${clickCount} 次，共 ${clkTimes} 次`;
-      intervalId = setTimeout(clickLoop, delayMs);
-    }
-
-    clickLoop();
+    }, delayMs);
   }
 
   // 停止点击函数
   function stopClicking() {
     if (intervalId) {
-      clearTimeout(intervalId);
+      clearInterval(intervalId);
       intervalId = null;
       startBtn.disabled = false;
       stopBtn.disabled = true;
-      statusDisplay.textContent = "自动点击已停止";
+      console.log("自动点击已停止");
     }
   }
 
