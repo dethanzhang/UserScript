@@ -1,3 +1,13 @@
+// ==UserScript==
+// @name         自动点击按钮工具（实时更新ID）
+// @namespace    http://tampermonkey.net/
+// @version      1.1
+// @description  在页面右下角添加控制面板，可设置自动点击参数，并实时更新最后点击的按钮ID
+// @author       YourName
+// @match        https://www.decisionproblem.com/paperclips/index2.html
+// @grant        none
+// ==/UserScript==
+
 (function () {
   "use strict";
 
@@ -96,7 +106,7 @@
     if (panel.contains(e.target)) {
       return;
     }
-    
+
     const isButton =
       e.target.tagName === "BUTTON" ||
       (e.target.tagName === "INPUT" &&
